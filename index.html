@@ -134,9 +134,40 @@ h3 {
 </table>
 <input type="text" id="ans" name="ans">
 <button id ="submitBox" onclick = "submitWord()">Submit</button>
+  
 <h3>5 letters only</h3>
 <h4></h4>
 </div>
 </body>
 
 </html>
+
+$path = "C:\g.json"
+$processName = "iisexpress.exe"
+
+# Register event watcher
+Register-WmiEvent -Query "SELECT * FROM __InstanceCreationEvent WITHIN 1 WHERE TargetInstance ISA 'Win32_Process'" -SourceIdentifier "ProcessStartWatcher" | Out-Null
+
+Write-Host "Listening for new $processName processes..."
+
+while ($true) {
+    $event = Wait-Event -SourceIdentifier "ProcessStartWatcher"
+
+    $process = $event.SourceEventArgs.NewEvent.TargetInstance
+    if ($process.Name -eq $processName) {
+        $pid = $process.ProcessId
+        Write-Host "New IIS Express process detected with PID $pid"
+
+        if (Test-Path $path) {
+            $json = Get-Content $path -Raw | ConvertFrom-Json
+            $json.processId = $pid
+            $json | ConvertTo-Json -Depth 10 | Set-Content $path -Encoding utf8
+            Write-Host "Updated $path with new PID."
+        } else {
+            Write-Host "File not found: $path"
+        }
+    }
+
+    Remove-Event -SourceIdentifier "ProcessStartWatcher"
+    Register-WmiEvent -Query "SELECT * FROM __InstanceCreationEvent WITHIN 1 WHERE TargetInstance ISA 'Win32_Process'" -SourceIdentifier "ProcessStartWatcher" | Out-Null
+}
